@@ -8,8 +8,9 @@ import AstrologySection from './result/AstrologySection.jsx';
 import NumerologySection from './result/NumerologySection.jsx';
 import NamingSection from './result/NamingSection.jsx';
 import SynthesisSection from './result/SynthesisSection.jsx';
+import CorePortrait from './result/CorePortrait.jsx';
 
-export default function Result({ bazi, astrology, numerology, naming, mayaKin, synthesisCards, input, onRestart }) {
+export default function Result({ bazi, astrology, numerology, naming, mayaKin, synthesisCards, archetype, input, onRestart }) {
   const [tab, setTab] = useState('bazi');
 
   const today = new Date();
@@ -169,6 +170,18 @@ export default function Result({ bazi, astrology, numerology, naming, mayaKin, s
             ))}
           </div>
         </section>
+
+        <div className="section-divider mb-8" />
+
+        {/* 核心画像 - 第一眼共鸣的关键 */}
+        {archetype && (
+          <CorePortrait
+            archetype={archetype}
+            name={input.name}
+            age={age}
+            gender={input.gender}
+          />
+        )}
 
         <div className="section-divider mb-16" />
 
