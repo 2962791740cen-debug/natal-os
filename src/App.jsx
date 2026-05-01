@@ -161,4 +161,5 @@ export default function App() {
     );
   }
 
-  return <HeroPage onStart={() => setStep('input')}
+  return <HeroPage onStart={() => setStep('input')} />;
+}
