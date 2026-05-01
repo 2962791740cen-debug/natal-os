@@ -1,0 +1,23 @@
+# Netlify 部署配置
+# 国内访问优化：Netlify 国内 CDN 可达性远好于 github.io
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA 路由 fallback（虽然当前是单页但留着安全）
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# 安全 headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
