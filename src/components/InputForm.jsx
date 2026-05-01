@@ -1,24 +1,25 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  ArrowRight, ArrowLeft, MapPin, Search, X, Sun, Moon, Sunrise, Sunset,
+  ArrowRight, ArrowLeft, MapPin, Search, X, Sun, Moon, Sunrise, Sunset, Lock,
 } from 'lucide-react';
 import { CITIES } from '../lib/cities.js';
 import { Brand, NoiseLayer } from './shared.jsx';
+import WheelPicker from './WheelPicker.jsx';
 
 // 12 时辰
 const SHICHEN = [
-  { name: '子时', range: [23, 1], emoji: '🌌', desc: '夜半' },
-  { name: '丑时', range: [1, 3], emoji: '🌃', desc: '鸡鸣' },
-  { name: '寅时', range: [3, 5], emoji: '🌒', desc: '平旦' },
-  { name: '卯时', range: [5, 7], emoji: '🌅', desc: '日出' },
-  { name: '辰时', range: [7, 9], emoji: '☀️', desc: '食时' },
-  { name: '巳时', range: [9, 11], emoji: '🌤', desc: '隅中' },
-  { name: '午时', range: [11, 13], emoji: '☀️', desc: '日中' },
-  { name: '未时', range: [13, 15], emoji: '🌤', desc: '日昳' },
-  { name: '申时', range: [15, 17], emoji: '🌇', desc: '哺时' },
-  { name: '酉时', range: [17, 19], emoji: '🌆', desc: '日入' },
-  { name: '戌时', range: [19, 21], emoji: '🌃', desc: '黄昏' },
-  { name: '亥时', range: [21, 23], emoji: '🌌', desc: '人定' },
+  { name: '子时', range: [23, 1], emoji: '🌌', desc: '夜半 23–01' },
+  { name: '丑时', range: [1, 3], emoji: '🌃', desc: '鸡鸣 01–03' },
+  { name: '寅时', range: [3, 5], emoji: '🌒', desc: '平旦 03–05' },
+  { name: '卯时', range: [5, 7], emoji: '🌅', desc: '日出 05–07' },
+  { name: '辰时', range: [7, 9], emoji: '☀️', desc: '食时 07–09' },
+  { name: '巳时', range: [9, 11], emoji: '🌤', desc: '隅中 09–11' },
+  { name: '午时', range: [11, 13], emoji: '☀️', desc: '日中 11–13' },
+  { name: '未时', range: [13, 15], emoji: '🌤', desc: '日昳 13–15' },
+  { name: '申时', range: [15, 17], emoji: '🌇', desc: '哺时 15–17' },
+  { name: '酉时', range: [17, 19], emoji: '🌆', desc: '日入 17–19' },
+  { name: '戌时', range: [19, 21], emoji: '🌃', desc: '黄昏 19–21' },
+  { name: '亥时', range: [21, 23], emoji: '🌌', desc: '人定 21–23' },
 ];
 
 const getShichen = (hour) => {
@@ -26,7 +27,6 @@ const getShichen = (hour) => {
   return SHICHEN.find((s) => hour >= s.range[0] && hour < s.range[1]) || SHICHEN[6];
 };
 
-// 不知道时辰时的快捷
 const ROUGH_TIMES = [
   { label: '凌晨', icon: Moon, hour: 3 },
   { label: '早上', icon: Sunrise, hour: 7 },
@@ -36,51 +36,35 @@ const ROUGH_TIMES = [
   { label: '晚上', icon: Moon, hour: 21 },
 ];
 
-// 热门城市（按地理分组）
 const POPULAR_GROUPS = [
   { region: '一线', cities: ['北京', '上海', '广州', '深圳'] },
   { region: '热门', cities: ['杭州', '成都', '武汉', '西安', '南京', '天津'] },
   { region: '港澳台 & 海外', cities: ['香港', '澳门', '台北', '东京', '新加坡', '纽约', '伦敦'] },
 ];
 
-// 拼音首字母（粗略）
 const PINYIN_INITIAL = {
-  '北京': 'B', '上海': 'S', '广州': 'G', '深圳': 'S', '惠州': 'H', '东莞': 'D',
-  '佛山': 'F', '珠海': 'Z', '汕头': 'S', '杭州': 'H', '宁波': 'N', '温州': 'W',
-  '苏州': 'S', '无锡': 'W', '南京': 'N', '合肥': 'H', '成都': 'C', '昆明': 'K',
-  '贵阳': 'G', '西安': 'X', '兰州': 'L', '银川': 'Y', '西宁': 'X', '乌鲁木齐': 'W',
-  '武汉': 'W', '长沙': 'C', '郑州': 'Z', '南昌': 'N', '太原': 'T', '石家庄': 'S',
-  '济南': 'J', '青岛': 'Q', '呼和浩特': 'H', '沈阳': 'S', '大连': 'D', '长春': 'C',
-  '哈尔滨': 'H', '南宁': 'N', '海口': 'H', '三亚': 'S', '厦门': 'X', '福州': 'F',
-  '香港': 'X', '澳门': 'A', '台北': 'T', '拉萨': 'L', '天津': 'T', '重庆': 'C',
-  '中山': 'Z', '湛江': 'Z',
-  '东京': 'D', '首尔': 'S', '新加坡': 'X', '曼谷': 'M', '伦敦': 'L', '巴黎': 'B',
-  '柏林': 'B', '纽约': 'N', '洛杉矶': 'L', '旧金山': 'J', '悉尼': 'X', '墨尔本': 'M',
+  '北京':'B','上海':'S','广州':'G','深圳':'S','惠州':'H','东莞':'D','佛山':'F','珠海':'Z','汕头':'S','中山':'Z','湛江':'Z',
+  '杭州':'H','宁波':'N','温州':'W','苏州':'S','无锡':'W','南京':'N','合肥':'H','成都':'C','昆明':'K','贵阳':'G',
+  '西安':'X','兰州':'L','银川':'Y','西宁':'X','乌鲁木齐':'W','武汉':'W','长沙':'C','郑州':'Z','南昌':'N',
+  '太原':'T','石家庄':'S','济南':'J','青岛':'Q','呼和浩特':'H','沈阳':'S','大连':'D','长春':'C','哈尔滨':'H',
+  '南宁':'N','海口':'H','三亚':'S','厦门':'X','福州':'F','香港':'X','澳门':'A','台北':'T','拉萨':'L','天津':'T','重庆':'C',
+  '东京':'D','首尔':'S','新加坡':'X','曼谷':'M','伦敦':'L','巴黎':'B','柏林':'B','纽约':'N','洛杉矶':'L','旧金山':'J','悉尼':'X','墨尔本':'M',
+};
+
+// 工具：闰年判断
+const isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+const daysInMonth = (y, m) => {
+  if ([1, 3, 5, 7, 8, 10, 12].includes(m)) return 31;
+  if (m === 2) return isLeap(y) ? 29 : 28;
+  return 30;
 };
 
 export default function InputForm({ onSubmit, onBack, initialValues }) {
-  const today = new Date();
-
-  // 用 HTML5 date 输入：YYYY-MM-DD 字符串格式
-  const [dateStr, setDateStr] = useState(() => {
-    if (initialValues) {
-      const m = String(initialValues.month).padStart(2, '0');
-      const d = String(initialValues.day).padStart(2, '0');
-      return `${initialValues.year}-${m}-${d}`;
-    }
-    return '2000-01-01';
-  });
-
-  // 时间 HH:MM 字符串
-  const [timeStr, setTimeStr] = useState(() => {
-    if (initialValues) {
-      const h = String(initialValues.hour ?? 12).padStart(2, '0');
-      const m = String(initialValues.minute ?? 0).padStart(2, '0');
-      return `${h}:${m}`;
-    }
-    return '12:00';
-  });
-
+  const [year, setYear] = useState(initialValues?.year ?? 2000);
+  const [month, setMonth] = useState(initialValues?.month ?? 6);
+  const [day, setDay] = useState(initialValues?.day ?? 15);
+  const [hour, setHour] = useState(initialValues?.hour ?? 12);
+  const [minute, setMinute] = useState(initialValues?.minute ?? 0);
   const [unknownTime, setUnknownTime] = useState(false);
   const [city, setCity] = useState(initialValues?.city ?? CITIES.find((c) => c.name === '深圳'));
   const [citySearch, setCitySearch] = useState('');
@@ -90,14 +74,29 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
   const [enName, setEnName] = useState(initialValues?.enName ?? '');
   const [useTrueSolar, setUseTrueSolar] = useState(true);
 
-  // 解析当前 hour/minute
-  const [hour, minute] = timeStr.split(':').map((n) => parseInt(n, 10));
+  const today = new Date();
+  const yearList = useMemo(() => {
+    const arr = [];
+    for (let y = today.getFullYear(); y >= 1900; y--) arr.push(y);
+    return arr.reverse(); // 从 1900 → 现在，方便上滑找老年
+  }, []);
+  const monthList = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), []);
+  const maxDay = daysInMonth(year, month);
+  const dayList = useMemo(
+    () => Array.from({ length: maxDay }, (_, i) => i + 1),
+    [maxDay]
+  );
+
+  // 月份变化时，如果 day 超过当月最大天数，调整
+  React.useEffect(() => {
+    if (day > maxDay) setDay(maxDay);
+  }, [maxDay]);
+
+  const hourList = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
+  const minuteList = useMemo(() => Array.from({ length: 60 }, (_, i) => i), []);
+
   const shichen = useMemo(() => getShichen(hour), [hour]);
 
-  // 解析当前 year/month/day
-  const [year, month, day] = dateStr.split('-').map((n) => parseInt(n, 10));
-
-  // 城市搜索过滤
   const filteredCities = useMemo(() => {
     if (!citySearch) return CITIES;
     const q = citySearch.toLowerCase();
@@ -146,23 +145,30 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-6 pt-12 md:pt-16 pb-32 relative">
+      <div className="max-w-3xl mx-auto px-6 pt-12 pb-32 relative">
 
         {/* 标题 */}
-        <div className="mb-12 text-center animate-fade-in-up">
+        <div className="mb-10 text-center animate-fade-in-up">
           <p className="text-[10px] font-mono text-[#FF4D00] tracking-[0.5em] mb-5">
-            // STEP · 1 / 1
+            // INPUT
           </p>
           <h1 className="text-3xl md:text-5xl font-bold mb-4 tracking-wider leading-tight" style={{ fontFamily: 'Noto Serif SC' }}>
             告诉我<br />
             <span className="text-[#FF4D00]">你来到这里的那一刻</span>
           </h1>
-          <p className="text-white/50 text-sm md:text-base leading-loose tracking-wide" style={{ fontFamily: 'Noto Serif SC' }}>
-            填得越准 · 解码越细
-          </p>
         </div>
 
-        <div className="space-y-10">
+        {/* 隐私声明 */}
+        <div className="mb-10 mx-auto max-w-xl bg-[#FF4D00]/5 border border-[#FF4D00]/20 px-5 py-4 flex items-start gap-3">
+          <Lock size={16} className="text-[#FF4D00] flex-shrink-0 mt-0.5" />
+          <div className="text-xs text-white/70 leading-relaxed" style={{ fontFamily: 'Noto Serif SC' }}>
+            <span className="text-[#FF4D00] font-bold">隐私承诺：</span>
+            你输入的一切只在你浏览器的内存里。<br />
+            <span className="text-white/50">关闭页面 = 数据自动消失，不存、不传、不卖。</span>
+          </div>
+        </div>
+
+        <div className="space-y-12">
 
           {/* 名字 + 性别 */}
           <Section num="01" title="你叫什么">
@@ -192,29 +198,69 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
             </div>
           </Section>
 
-          {/* 出生日期 — HTML5 date picker */}
-          <Section num="02" title="出生日期" hint="点一下打开日历，或直接输入">
-            <DateInput value={dateStr} onChange={setDateStr} />
+          {/* 出生日期 — 三栏滚轮 */}
+          <Section num="02" title="出生日期" hint="滚动 / 点击 / 鼠标滚轮 都能选 · 不用手敲">
+            <div className="bg-white/[0.02] border border-white/10 p-4 md:p-6">
+              <div className="flex gap-2 md:gap-4">
+                <WheelPicker
+                  items={yearList}
+                  value={year}
+                  onChange={setYear}
+                  label="YEAR · 年"
+                />
+                <WheelPicker
+                  items={monthList}
+                  value={month}
+                  onChange={setMonth}
+                  format={(v) => v}
+                  label="MONTH · 月"
+                />
+                <WheelPicker
+                  items={dayList}
+                  value={day}
+                  onChange={setDay}
+                  format={(v) => v}
+                  label="DAY · 日"
+                />
+              </div>
+              <p className="text-[11px] text-white/40 text-center mt-3 tracking-wide">
+                {year} 年 {month} 月 {day} 日
+              </p>
+            </div>
           </Section>
 
           {/* 出生时刻 */}
           <Section num="03" title="出生时刻" hint={unknownTime ? '已选"不知道时辰"模式' : '差一个时辰，时柱整变'}>
             {!unknownTime && (
               <>
-                {/* 大字时间 + 时辰显示 */}
-                <div className="bg-white/[0.02] border border-white/10 p-5 mb-4 flex flex-wrap items-center gap-4">
-                  <TimeInput value={timeStr} onChange={setTimeStr} />
-                  <div className="flex-1 min-w-[120px]">
-                    <div className="text-[10px] font-mono text-white/40 tracking-widest mb-1">CURRENT</div>
-                    <div className="text-2xl" style={{ fontFamily: 'Noto Serif SC' }}>
-                      <span className="text-2xl mr-2">{shichen.emoji}</span>
-                      <span className="text-[#FF4D00] font-bold">{shichen.name}</span>
-                      <span className="text-white/40 text-xs ml-2">{shichen.desc}</span>
-                    </div>
+                {/* 时分滚轮 + 当前时辰显示 */}
+                <div className="bg-white/[0.02] border border-white/10 p-4 md:p-6 mb-4">
+                  <div className="grid grid-cols-2 gap-2 md:gap-4 mb-4">
+                    <WheelPicker
+                      items={hourList}
+                      value={hour}
+                      onChange={setHour}
+                      format={(v) => String(v).padStart(2, '0')}
+                      label="HOUR · 时"
+                    />
+                    <WheelPicker
+                      items={minuteList}
+                      value={minute}
+                      onChange={setMinute}
+                      format={(v) => String(v).padStart(2, '0')}
+                      label="MINUTE · 分"
+                    />
+                  </div>
+                  <div className="text-center pt-3 border-t border-white/5">
+                    <span className="text-2xl mr-2">{shichen.emoji}</span>
+                    <span className="text-[#FF4D00] text-lg font-bold" style={{ fontFamily: 'Noto Serif SC' }}>
+                      {shichen.name}
+                    </span>
+                    <span className="text-white/40 text-xs ml-3">{shichen.desc}</span>
                   </div>
                 </div>
 
-                {/* 12 时辰快捷 */}
+                {/* 12 时辰快捷标签 */}
                 <div className="grid grid-cols-6 md:grid-cols-12 gap-1 mb-4">
                   {SHICHEN.map((sc) => {
                     const active = shichen.name === sc.name;
@@ -224,7 +270,8 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
                         type="button"
                         onClick={() => {
                           const h = sc.range[0] === 23 ? 23 : sc.range[0] + 1;
-                          setTimeStr(`${String(h).padStart(2, '0')}:00`);
+                          setHour(h);
+                          setMinute(0);
                         }}
                         title={`${sc.name} · ${sc.desc}`}
                         className={`py-2 text-xs transition-all border ${
@@ -252,7 +299,7 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
                     <button
                       key={rt.label}
                       type="button"
-                      onClick={() => setTimeStr(`${String(rt.hour).padStart(2, '0')}:00`)}
+                      onClick={() => { setHour(rt.hour); setMinute(0); }}
                       className={`py-4 border transition-all flex flex-col items-center gap-1 ${
                         active
                           ? 'border-[#FF4D00] bg-[#FF4D00]/10 text-[#FF4D00]'
@@ -297,8 +344,7 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
               </div>
               {useTrueSolar && city.lng !== 120 && (
                 <div className="text-[11px] text-white/50 mt-3 font-mono">
-                  ↳ 真太阳时偏移 {((city.lng - 120) * 4).toFixed(1)} 分钟（
-                  {(city.lng - 120) > 0 ? '比北京时间早' : '比北京时间晚'}）
+                  ↳ 真太阳时偏移 {((city.lng - 120) * 4).toFixed(1)} 分钟
                 </div>
               )}
             </div>
@@ -309,10 +355,7 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
               <input
                 type="text"
                 value={citySearch}
-                onChange={(e) => {
-                  setCitySearch(e.target.value);
-                  setShowCitySearch(true);
-                }}
+                onChange={(e) => { setCitySearch(e.target.value); setShowCitySearch(true); }}
                 onFocus={() => setShowCitySearch(true)}
                 placeholder="搜索城市（中文 / 拼音首字母如 BJ）..."
                 className="w-full bg-white/[0.02] border border-white/10 pl-12 pr-12 py-4 text-base focus:border-[#FF4D00] focus:outline-none transition-colors"
@@ -328,7 +371,6 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
               )}
             </div>
 
-            {/* 搜索结果 */}
             {showCitySearch && citySearch && (
               <div className="bg-[#0a0a0a] border border-white/10 max-h-64 overflow-y-auto mb-4 animate-slide-down">
                 {filteredCities.length === 0 ? (
@@ -356,7 +398,6 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
               </div>
             )}
 
-            {/* 热门快捷（不在搜索时显示） */}
             {!citySearch && (
               <div className="space-y-3">
                 {POPULAR_GROUPS.map((group) => (
@@ -423,8 +464,6 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
   );
 }
 
-// ============ 子组件 ============
-
 const Section = ({ num, title, hint, children }) => (
   <section className="animate-fade-in-up">
     <div className="flex items-baseline gap-3 mb-2">
@@ -450,58 +489,3 @@ const SoftInput = ({ value, onChange, placeholder }) => (
     style={{ fontFamily: 'Noto Serif SC' }}
   />
 );
-
-// HTML5 date 输入：原生日历选择器，PC 鼠标点击 + 键盘输入都丝滑
-const DateInput = ({ value, onChange }) => {
-  const [year, month, day] = value.split('-').map((n) => parseInt(n, 10));
-  return (
-    <div className="relative bg-white/[0.02] border border-white/10 hover:border-white/30 focus-within:border-[#FF4D00] transition-colors">
-      <div className="flex items-center px-5 py-5">
-        <div className="flex-1 flex items-baseline gap-3">
-          <span className="text-4xl md:text-5xl font-bold text-[#FF4D00]" style={{ fontFamily: 'Noto Serif SC' }}>{year}</span>
-          <span className="text-white/40 text-sm">年</span>
-          <span className="text-4xl md:text-5xl font-bold" style={{ fontFamily: 'Noto Serif SC' }}>{month}</span>
-          <span className="text-white/40 text-sm">月</span>
-          <span className="text-4xl md:text-5xl font-bold" style={{ fontFamily: 'Noto Serif SC' }}>{day}</span>
-          <span className="text-white/40 text-sm">日</span>
-        </div>
-        <span className="text-[10px] font-mono text-white/30 tracking-widest hidden md:block">CLICK / TAP →</span>
-      </div>
-      {/* 隐形覆盖整个区域的原生 input，点击任何位置都能弹出系统日期选择器 */}
-      <input
-        type="date"
-        value={value}
-        min="1900-01-01"
-        max="2099-12-31"
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-      />
-    </div>
-  );
-};
-
-const TimeInput = ({ value, onChange }) => {
-  const [hour, minute] = value.split(':').map((n) => parseInt(n, 10));
-  return (
-    <div className="relative bg-white/[0.02] border border-white/10 hover:border-white/30 focus-within:border-[#FF4D00] transition-colors">
-      <div className="flex items-center px-5 py-4">
-        <div className="flex items-baseline gap-2">
-          <span className="text-4xl md:text-5xl font-bold text-[#FF4D00] font-mono">
-            {String(hour).padStart(2, '0')}
-          </span>
-          <span className="text-white/40 text-sm">时</span>
-          <span className="text-4xl md:text-5xl font-bold font-mono">
-            {String(minute).padStart(2, '0')}
-          </span>
-          <span className="text-white/40 text-sm">分</span>
-        </div>
-      </div>
-      <input
-        type="time"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-      />
-    </div>
-  );
-};

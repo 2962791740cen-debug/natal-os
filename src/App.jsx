@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import HeroPage from './components/HeroPage.jsx';
 import InputForm from './components/InputForm.jsx';
 import TransitionScreen from './components/TransitionScreen.jsx';
@@ -10,7 +10,10 @@ import { calculateNaming } from './lib/naming.js';
 import { generateSynthesis, generateArchetype } from './lib/synthesis.js';
 import { generatePersona } from './lib/persona.js';
 
-const STORAGE_KEY = 'natal-os-last-input';
+// 全部数据只在 React state 里
+// 不写 localStorage / sessionStorage / cookie / IndexedDB
+// 关闭页面 / 刷新 / 退出 → 数据自动消失
+const STALE_KEY = 'natal-os-last-input'; // 历史遗留 key，启动时清掉
 
 export default function App() {
   const [step, setStep] = useState('hero');
@@ -18,19 +21,41 @@ export default function App() {
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
 
+  // ===== 启动时清空所有可能存在的本地存储（保险） =====
+  useEffect(() => {
+    try {
+      localStorage.removeItem(STALE_KEY);
+      sessionStorage.removeItem(STALE_KEY);
+      // 清掉所有以 natal-os 开头的 key（防御性）
+      Object.keys(localStorage).forEach((k) => {
+        if (k.startsWith('natal-os')) localStorage.removeItem(k);
+      });
+      Object.keys(sessionStorage).forEach((k) => {
+        if (k.startsWith('natal-os')) sessionStorage.removeItem(k);
+      });
+    } catch (e) { /* ignore */ }
+  }, []);
+
+  // ===== 关闭页面 / 刷新前清空 React state（双保险，防 BFCache 残留） =====
+  useEffect(() => {
+    const wipe = () => {
+      setInput(null);
+      setResults(null);
+    };
+    window.addEventListener('beforeunload', wipe);
+    window.addEventListener('pagehide', wipe);
+    return () => {
+      window.removeEventListener('beforeunload', wipe);
+      window.removeEventListener('pagehide', wipe);
+    };
+  }, []);
+
   const handleSubmit = useCallback((data) => {
     setInput(data);
     setStep('computing');
     setError(null);
 
-    // 持久化
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-      // ignore
-    }
-
-    // 异步计算
+    // 异步计算（不持久化任何数据）
     setTimeout(() => {
       try {
         const bazi = calculateBazi(data);
@@ -53,13 +78,7 @@ export default function App() {
           ? calculateNaming(data.name)
           : null;
 
-        const synthesisCards = generateSynthesis({
-          bazi,
-          astrology,
-          numerology,
-          naming,
-        });
-
+        const synthesisCards = generateSynthesis({ bazi, astrology, numerology, naming });
         const archetype = generateArchetype({ bazi, astrology, numerology });
         const persona = generatePersona({ bazi, astrology, numerology });
 
@@ -77,7 +96,6 @@ export default function App() {
     } else if (error) {
       setStep('input');
     } else {
-      // 计算还没完成，再等等
       setTimeout(() => {
         if (results) setStep('result');
         else setStep('input');
@@ -85,23 +103,12 @@ export default function App() {
     }
   }, [results, error]);
 
+  // 退出/重新开始：彻底清空所有数据
   const restart = useCallback(() => {
     setStep('hero');
     setInput(null);
     setResults(null);
     setError(null);
-  }, []);
-
-  // 加载保存的输入（高级功能）
-  const loadSaved = useCallback(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const data = JSON.parse(saved);
-        return data;
-      }
-    } catch (e) { /* ignore */ }
-    return null;
   }, []);
 
   if (step === 'hero') {
@@ -111,8 +118,8 @@ export default function App() {
     return (
       <InputForm
         onSubmit={handleSubmit}
-        onBack={() => setStep('hero')}
-        initialValues={input || loadSaved()}
+        onBack={() => { setInput(null); setStep('hero'); }}
+        initialValues={input}
       />
     );
   }
@@ -136,7 +143,6 @@ export default function App() {
     );
   }
 
-  // 错误兜底
   if (error) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center p-6">
@@ -155,5 +161,4 @@ export default function App() {
     );
   }
 
-  return <HeroPage onStart={() => setStep('input')} />;
-}
+  return <HeroPage onStart={() => setStep('input')}
