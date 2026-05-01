@@ -8,6 +8,7 @@ import { calculateAstrology } from './lib/astrology.js';
 import { calculateNumerology, calculateMayaKin } from './lib/numerology.js';
 import { calculateNaming } from './lib/naming.js';
 import { generateSynthesis, generateArchetype } from './lib/synthesis.js';
+import { generatePersona } from './lib/persona.js';
 
 const STORAGE_KEY = 'natal-os-last-input';
 
@@ -60,8 +61,9 @@ export default function App() {
         });
 
         const archetype = generateArchetype({ bazi, astrology, numerology });
+        const persona = generatePersona({ bazi, astrology, numerology });
 
-        setResults({ bazi, astrology, numerology, mayaKin, naming, synthesisCards, archetype });
+        setResults({ bazi, astrology, numerology, mayaKin, naming, synthesisCards, archetype, persona });
       } catch (e) {
         console.error('计算失败：', e);
         setError(e.message || '计算失败');
@@ -127,6 +129,7 @@ export default function App() {
         naming={results.naming}
         synthesisCards={results.synthesisCards}
         archetype={results.archetype}
+        persona={results.persona}
         input={input}
         onRestart={restart}
       />

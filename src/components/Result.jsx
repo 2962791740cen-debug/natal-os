@@ -9,8 +9,9 @@ import NumerologySection from './result/NumerologySection.jsx';
 import NamingSection from './result/NamingSection.jsx';
 import SynthesisSection from './result/SynthesisSection.jsx';
 import CorePortrait from './result/CorePortrait.jsx';
+import PersonaSection from './result/PersonaSection.jsx';
 
-export default function Result({ bazi, astrology, numerology, naming, mayaKin, synthesisCards, archetype, input, onRestart }) {
+export default function Result({ bazi, astrology, numerology, naming, mayaKin, synthesisCards, archetype, persona, input, onRestart }) {
   const [tab, setTab] = useState('bazi');
 
   const today = new Date();
@@ -181,6 +182,14 @@ export default function Result({ bazi, astrology, numerology, naming, mayaKin, s
             age={age}
             gender={input.gender}
           />
+        )}
+
+        {/* "你这个人" - 场景化共鸣段落 */}
+        {persona && persona.length > 0 && (
+          <>
+            <div className="section-divider my-8" />
+            <PersonaSection categories={persona} />
+          </>
         )}
 
         <div className="section-divider mb-16" />

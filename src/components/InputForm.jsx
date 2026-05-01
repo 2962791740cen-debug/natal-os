@@ -1,24 +1,24 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
-  ArrowRight, ArrowLeft, Calendar, Clock, MapPin, User, Sparkles, Search, X,
+  ArrowRight, ArrowLeft, MapPin, Search, X, Sun, Moon, Sunrise, Sunset,
 } from 'lucide-react';
 import { CITIES } from '../lib/cities.js';
 import { Brand, NoiseLayer } from './shared.jsx';
 
-// 时辰对照
+// 12 时辰
 const SHICHEN = [
-  { range: [23, 1], name: '子时', desc: '夜半 · 23:00–01:00' },
-  { range: [1, 3], name: '丑时', desc: '鸡鸣 · 01:00–03:00' },
-  { range: [3, 5], name: '寅时', desc: '平旦 · 03:00–05:00' },
-  { range: [5, 7], name: '卯时', desc: '日出 · 05:00–07:00' },
-  { range: [7, 9], name: '辰时', desc: '食时 · 07:00–09:00' },
-  { range: [9, 11], name: '巳时', desc: '隅中 · 09:00–11:00' },
-  { range: [11, 13], name: '午时', desc: '日中 · 11:00–13:00' },
-  { range: [13, 15], name: '未时', desc: '日昳 · 13:00–15:00' },
-  { range: [15, 17], name: '申时', desc: '哺时 · 15:00–17:00' },
-  { range: [17, 19], name: '酉时', desc: '日入 · 17:00–19:00' },
-  { range: [19, 21], name: '戌时', desc: '黄昏 · 19:00–21:00' },
-  { range: [21, 23], name: '亥时', desc: '人定 · 21:00–23:00' },
+  { name: '子时', range: [23, 1], emoji: '🌌', desc: '夜半' },
+  { name: '丑时', range: [1, 3], emoji: '🌃', desc: '鸡鸣' },
+  { name: '寅时', range: [3, 5], emoji: '🌒', desc: '平旦' },
+  { name: '卯时', range: [5, 7], emoji: '🌅', desc: '日出' },
+  { name: '辰时', range: [7, 9], emoji: '☀️', desc: '食时' },
+  { name: '巳时', range: [9, 11], emoji: '🌤', desc: '隅中' },
+  { name: '午时', range: [11, 13], emoji: '☀️', desc: '日中' },
+  { name: '未时', range: [13, 15], emoji: '🌤', desc: '日昳' },
+  { name: '申时', range: [15, 17], emoji: '🌇', desc: '哺时' },
+  { name: '酉时', range: [17, 19], emoji: '🌆', desc: '日入' },
+  { name: '戌时', range: [19, 21], emoji: '🌃', desc: '黄昏' },
+  { name: '亥时', range: [21, 23], emoji: '🌌', desc: '人定' },
 ];
 
 const getShichen = (hour) => {
@@ -26,30 +26,87 @@ const getShichen = (hour) => {
   return SHICHEN.find((s) => hour >= s.range[0] && hour < s.range[1]) || SHICHEN[6];
 };
 
-// 主流城市快捷
-const TOP_CITIES = ['北京', '上海', '广州', '深圳', '杭州', '成都', '香港', '台北'];
+// 不知道时辰时的快捷
+const ROUGH_TIMES = [
+  { label: '凌晨', icon: Moon, hour: 3 },
+  { label: '早上', icon: Sunrise, hour: 7 },
+  { label: '中午', icon: Sun, hour: 12 },
+  { label: '下午', icon: Sun, hour: 15 },
+  { label: '傍晚', icon: Sunset, hour: 18 },
+  { label: '晚上', icon: Moon, hour: 21 },
+];
+
+// 热门城市（按地理分组）
+const POPULAR_GROUPS = [
+  { region: '一线', cities: ['北京', '上海', '广州', '深圳'] },
+  { region: '热门', cities: ['杭州', '成都', '武汉', '西安', '南京', '天津'] },
+  { region: '港澳台 & 海外', cities: ['香港', '澳门', '台北', '东京', '新加坡', '纽约', '伦敦'] },
+];
+
+// 拼音首字母（粗略）
+const PINYIN_INITIAL = {
+  '北京': 'B', '上海': 'S', '广州': 'G', '深圳': 'S', '惠州': 'H', '东莞': 'D',
+  '佛山': 'F', '珠海': 'Z', '汕头': 'S', '杭州': 'H', '宁波': 'N', '温州': 'W',
+  '苏州': 'S', '无锡': 'W', '南京': 'N', '合肥': 'H', '成都': 'C', '昆明': 'K',
+  '贵阳': 'G', '西安': 'X', '兰州': 'L', '银川': 'Y', '西宁': 'X', '乌鲁木齐': 'W',
+  '武汉': 'W', '长沙': 'C', '郑州': 'Z', '南昌': 'N', '太原': 'T', '石家庄': 'S',
+  '济南': 'J', '青岛': 'Q', '呼和浩特': 'H', '沈阳': 'S', '大连': 'D', '长春': 'C',
+  '哈尔滨': 'H', '南宁': 'N', '海口': 'H', '三亚': 'S', '厦门': 'X', '福州': 'F',
+  '香港': 'X', '澳门': 'A', '台北': 'T', '拉萨': 'L', '天津': 'T', '重庆': 'C',
+  '中山': 'Z', '湛江': 'Z',
+  '东京': 'D', '首尔': 'S', '新加坡': 'X', '曼谷': 'M', '伦敦': 'L', '巴黎': 'B',
+  '柏林': 'B', '纽约': 'N', '洛杉矶': 'L', '旧金山': 'J', '悉尼': 'X', '墨尔本': 'M',
+};
 
 export default function InputForm({ onSubmit, onBack, initialValues }) {
   const today = new Date();
-  const [year, setYear] = useState(initialValues?.year ?? 2000);
-  const [month, setMonth] = useState(initialValues?.month ?? 1);
-  const [day, setDay] = useState(initialValues?.day ?? 1);
-  const [hour, setHour] = useState(initialValues?.hour ?? 12);
-  const [minute, setMinute] = useState(initialValues?.minute ?? 0);
+
+  // 用 HTML5 date 输入：YYYY-MM-DD 字符串格式
+  const [dateStr, setDateStr] = useState(() => {
+    if (initialValues) {
+      const m = String(initialValues.month).padStart(2, '0');
+      const d = String(initialValues.day).padStart(2, '0');
+      return `${initialValues.year}-${m}-${d}`;
+    }
+    return '2000-01-01';
+  });
+
+  // 时间 HH:MM 字符串
+  const [timeStr, setTimeStr] = useState(() => {
+    if (initialValues) {
+      const h = String(initialValues.hour ?? 12).padStart(2, '0');
+      const m = String(initialValues.minute ?? 0).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+    return '12:00';
+  });
+
   const [unknownTime, setUnknownTime] = useState(false);
   const [city, setCity] = useState(initialValues?.city ?? CITIES.find((c) => c.name === '深圳'));
   const [citySearch, setCitySearch] = useState('');
-  const [showCityList, setShowCityList] = useState(false);
+  const [showCitySearch, setShowCitySearch] = useState(false);
   const [gender, setGender] = useState(initialValues?.gender ?? 'male');
   const [name, setName] = useState(initialValues?.name ?? '');
   const [enName, setEnName] = useState(initialValues?.enName ?? '');
   const [useTrueSolar, setUseTrueSolar] = useState(true);
 
+  // 解析当前 hour/minute
+  const [hour, minute] = timeStr.split(':').map((n) => parseInt(n, 10));
   const shichen = useMemo(() => getShichen(hour), [hour]);
 
-  const filteredCities = citySearch
-    ? CITIES.filter((c) => c.name.includes(citySearch)).slice(0, 50)
-    : CITIES;
+  // 解析当前 year/month/day
+  const [year, month, day] = dateStr.split('-').map((n) => parseInt(n, 10));
+
+  // 城市搜索过滤
+  const filteredCities = useMemo(() => {
+    if (!citySearch) return CITIES;
+    const q = citySearch.toLowerCase();
+    return CITIES.filter((c) => {
+      if (c.name.includes(citySearch)) return true;
+      const initial = (PINYIN_INITIAL[c.name] || '').toLowerCase();
+      return initial.startsWith(q[0] || '');
+    });
+  }, [citySearch]);
 
   const submit = () => {
     onSubmit({
@@ -71,10 +128,9 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
   const valid = year && month && day && city;
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-hidden">
+    <div className="min-h-screen bg-black text-white relative overflow-x-hidden">
       <NoiseLayer opacity={0.03} />
 
-      {/* 中轴红线 */}
       <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-[#FF4D00]/15 to-transparent pointer-events-none" />
 
       {/* 顶部 */}
@@ -90,127 +146,128 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-6 pt-16 pb-32 relative">
+      <div className="max-w-3xl mx-auto px-6 pt-12 md:pt-16 pb-32 relative">
+
         {/* 标题 */}
-        <div className="mb-16 text-center animate-fade-in-up">
-          <p className="text-[10px] font-mono text-[#FF4D00] tracking-[0.5em] mb-6">
-            // INPUT.FORM
+        <div className="mb-12 text-center animate-fade-in-up">
+          <p className="text-[10px] font-mono text-[#FF4D00] tracking-[0.5em] mb-5">
+            // STEP · 1 / 1
           </p>
-          <h1 className="text-4xl md:text-6xl font-bold mb-6 tracking-wider leading-tight" style={{ fontFamily: 'Noto Serif SC' }}>
+          <h1 className="text-3xl md:text-5xl font-bold mb-4 tracking-wider leading-tight" style={{ fontFamily: 'Noto Serif SC' }}>
             告诉我<br />
             <span className="text-[#FF4D00]">你来到这里的那一刻</span>
           </h1>
-          <p className="text-white/50 text-sm md:text-base leading-loose tracking-wide max-w-md mx-auto" style={{ fontFamily: 'Noto Serif SC' }}>
-            时间精度越高，<br />
-            解码颗粒度越细。
+          <p className="text-white/50 text-sm md:text-base leading-loose tracking-wide" style={{ fontFamily: 'Noto Serif SC' }}>
+            填得越准 · 解码越细
           </p>
         </div>
 
-        <div className="space-y-12">
+        <div className="space-y-10">
 
-          {/* 名字 */}
-          <FormSection
-            num="01"
-            title="你叫什么"
-            sub="WHO ARE YOU"
-            hint="中文姓名用于姓名学解码；不填也能用"
-          >
-            <div className="grid md:grid-cols-2 gap-3">
-              <BigInput
-                value={name}
-                onChange={setName}
-                placeholder="中文姓名"
-                icon="字"
-              />
-              <BigInput
-                value={enName}
-                onChange={setEnName}
-                placeholder="英文 / 拼音名"
-                icon="A"
-              />
+          {/* 名字 + 性别 */}
+          <Section num="01" title="你叫什么">
+            <div className="grid md:grid-cols-2 gap-3 mb-4">
+              <SoftInput value={name} onChange={setName} placeholder="中文姓名（用于姓名学）" />
+              <SoftInput value={enName} onChange={setEnName} placeholder="英文 / 拼音名（选填）" />
             </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               {[
-                { v: 'male', l: '男', en: 'MALE' },
-                { v: 'female', l: '女', en: 'FEMALE' },
+                { v: 'male', l: '男 · MALE' },
+                { v: 'female', l: '女 · FEMALE' },
               ].map((opt) => (
                 <button
                   key={opt.v}
                   type="button"
                   onClick={() => setGender(opt.v)}
-                  className={`px-6 py-4 border transition-all flex items-center justify-center gap-3 ${
+                  className={`px-6 py-4 border transition-all tracking-widest text-sm ${
                     gender === opt.v
                       ? 'border-[#FF4D00] bg-[#FF4D00]/10 text-[#FF4D00]'
-                      : 'border-white/10 bg-white/[0.02] text-white/50 hover:border-white/30 hover:text-white/80'
+                      : 'border-white/10 bg-white/[0.02] text-white/50 hover:border-white/30'
                   }`}
+                  style={{ fontFamily: 'Noto Serif SC' }}
                 >
-                  <span className="text-xl" style={{ fontFamily: 'Noto Serif SC' }}>{opt.l}</span>
-                  <span className="text-[10px] font-mono tracking-widest">{opt.en}</span>
+                  {opt.l}
                 </button>
               ))}
             </div>
-          </FormSection>
+          </Section>
+
+          {/* 出生日期 — HTML5 date picker */}
+          <Section num="02" title="出生日期" hint="点一下打开日历，或直接输入">
+            <DateInput value={dateStr} onChange={setDateStr} />
+          </Section>
 
           {/* 出生时刻 */}
-          <FormSection
-            num="02"
-            title="出生那一秒"
-            sub="THAT SECOND"
-            hint="差一个时辰，时柱整变；差 4 分钟，上升星座移 1°"
-          >
-            {/* 年月日 */}
-            <div className="grid grid-cols-3 gap-3 mb-5">
-              <DateInput value={year} onChange={setYear} min={1900} max={today.getFullYear()} suffix="年" big />
-              <DateInput value={month} onChange={setMonth} min={1} max={12} suffix="月" big />
-              <DateInput value={day} onChange={setDay} min={1} max={31} suffix="日" big />
-            </div>
+          <Section num="03" title="出生时刻" hint={unknownTime ? '已选"不知道时辰"模式' : '差一个时辰，时柱整变'}>
+            {!unknownTime && (
+              <>
+                {/* 大字时间 + 时辰显示 */}
+                <div className="bg-white/[0.02] border border-white/10 p-5 mb-4 flex flex-wrap items-center gap-4">
+                  <TimeInput value={timeStr} onChange={setTimeStr} />
+                  <div className="flex-1 min-w-[120px]">
+                    <div className="text-[10px] font-mono text-white/40 tracking-widest mb-1">CURRENT</div>
+                    <div className="text-2xl" style={{ fontFamily: 'Noto Serif SC' }}>
+                      <span className="text-2xl mr-2">{shichen.emoji}</span>
+                      <span className="text-[#FF4D00] font-bold">{shichen.name}</span>
+                      <span className="text-white/40 text-xs ml-2">{shichen.desc}</span>
+                    </div>
+                  </div>
+                </div>
 
-            {/* 时辰可视化 */}
-            <div className={`transition-opacity ${unknownTime ? 'opacity-30 pointer-events-none' : ''}`}>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-mono text-white/40 tracking-widest">TIME · 时刻</span>
-                <span className="text-sm" style={{ fontFamily: 'Noto Serif SC' }}>
-                  <span className="text-[#FF4D00]">{shichen.name}</span>
-                  <span className="text-white/40 ml-2 text-xs">{shichen.desc}</span>
-                </span>
-              </div>
+                {/* 12 时辰快捷 */}
+                <div className="grid grid-cols-6 md:grid-cols-12 gap-1 mb-4">
+                  {SHICHEN.map((sc) => {
+                    const active = shichen.name === sc.name;
+                    return (
+                      <button
+                        key={sc.name}
+                        type="button"
+                        onClick={() => {
+                          const h = sc.range[0] === 23 ? 23 : sc.range[0] + 1;
+                          setTimeStr(`${String(h).padStart(2, '0')}:00`);
+                        }}
+                        title={`${sc.name} · ${sc.desc}`}
+                        className={`py-2 text-xs transition-all border ${
+                          active
+                            ? 'bg-[#FF4D00] text-black border-[#FF4D00]'
+                            : 'bg-white/[0.02] text-white/50 border-white/5 hover:border-white/20 hover:text-white'
+                        }`}
+                        style={{ fontFamily: 'Noto Serif SC' }}
+                      >
+                        {sc.name[0]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <DateInput value={hour} onChange={setHour} min={0} max={23} suffix="时" big />
-                <DateInput value={minute} onChange={setMinute} min={0} max={59} suffix="分" big />
-              </div>
-
-              {/* 12 时辰快捷 */}
-              <div className="grid grid-cols-6 md:grid-cols-12 gap-1">
-                {SHICHEN.map((sc) => {
-                  const active = shichen.name === sc.name;
+            {/* 不知道时辰：粗略时间快捷 */}
+            {unknownTime && (
+              <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-4 animate-fade-in-up">
+                {ROUGH_TIMES.map((rt) => {
+                  const active = hour === rt.hour;
+                  const Icon = rt.icon;
                   return (
                     <button
-                      key={sc.name}
+                      key={rt.label}
                       type="button"
-                      onClick={() => {
-                        const start = sc.range[0];
-                        setHour(start === 23 ? 23 : start);
-                        setMinute(30);
-                      }}
-                      title={sc.desc}
-                      className={`py-2 text-xs transition-all ${
+                      onClick={() => setTimeStr(`${String(rt.hour).padStart(2, '0')}:00`)}
+                      className={`py-4 border transition-all flex flex-col items-center gap-1 ${
                         active
-                          ? 'bg-[#FF4D00] text-black'
-                          : 'bg-white/[0.03] text-white/50 hover:bg-white/10 hover:text-white'
+                          ? 'border-[#FF4D00] bg-[#FF4D00]/10 text-[#FF4D00]'
+                          : 'border-white/10 bg-white/[0.02] text-white/60 hover:border-white/30'
                       }`}
-                      style={{ fontFamily: 'Noto Serif SC' }}
                     >
-                      {sc.name}
+                      <Icon size={16} />
+                      <span className="text-sm" style={{ fontFamily: 'Noto Serif SC' }}>{rt.label}</span>
                     </button>
                   );
                 })}
               </div>
-            </div>
+            )}
 
-            {/* 不知道时辰 */}
-            <label className="flex items-center gap-2 mt-5 text-xs text-white/60 cursor-pointer">
+            <label className="flex items-center gap-2 text-xs text-white/60 cursor-pointer">
               <input
                 type="checkbox"
                 checked={unknownTime}
@@ -218,103 +275,123 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
                 className="accent-[#FF4D00]"
               />
               <span style={{ fontFamily: 'Noto Serif SC' }}>不知道具体时辰</span>
-              <span className="text-[10px] text-white/30 ml-1">（八字时柱与上升星座精度受影响）</span>
+              <span className="text-[10px] text-white/30 ml-1">（结果仍可参考，时柱与上升星座精度受影响）</span>
             </label>
-          </FormSection>
+          </Section>
 
           {/* 出生地 */}
-          <FormSection
-            num="03"
-            title="那时你在哪"
-            sub="WHERE YOU LANDED"
-            hint="经度决定真太阳时校正；纬度决定上升与中天星座"
-          >
-            {/* 快捷城市 */}
-            <div className="mb-4">
-              <div className="text-[10px] font-mono text-white/30 tracking-widest mb-2">QUICK SELECT</div>
-              <div className="flex gap-2 flex-wrap">
-                {TOP_CITIES.map((cn) => {
-                  const c = CITIES.find((x) => x.name === cn);
-                  if (!c) return null;
-                  const active = city.name === cn;
-                  return (
-                    <button
-                      key={cn}
-                      type="button"
-                      onClick={() => setCity(c)}
-                      className={`px-4 py-2 text-sm border transition-all ${
-                        active
-                          ? 'border-[#FF4D00] bg-[#FF4D00]/10 text-[#FF4D00]'
-                          : 'border-white/10 bg-white/[0.02] text-white/60 hover:border-white/30'
-                      }`}
-                      style={{ fontFamily: 'Noto Serif SC' }}
-                    >
-                      {cn}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 当前选中显示 + 搜索 */}
-            <div className="bg-white/[0.03] border border-white/10 p-5">
-              <div className="flex items-center justify-between mb-3">
+          <Section num="04" title="出生地" hint="经度决定真太阳时；纬度决定上升星座">
+            {/* 当前选中显示 */}
+            <div className="bg-white/[0.03] border border-white/10 p-5 mb-4">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-3">
-                  <MapPin size={18} className="text-[#FF4D00]" />
-                  <span className="text-2xl font-bold" style={{ fontFamily: 'Noto Serif SC' }}>
+                  <MapPin size={20} className="text-[#FF4D00]" />
+                  <span className="text-3xl font-bold" style={{ fontFamily: 'Noto Serif SC' }}>
                     {city.name}
                   </span>
-                  <span className="text-[11px] font-mono text-white/40">
-                    {city.lng.toFixed(2)}°{city.lng >= 0 ? 'E' : 'W'} · {Math.abs(city.lat).toFixed(2)}°{city.lat >= 0 ? 'N' : 'S'}
-                  </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowCityList((p) => !p)}
-                  className="text-xs text-white/50 hover:text-[#FF4D00] tracking-widest font-mono"
-                >
-                  {showCityList ? <X size={14} /> : <Search size={14} />}
-                </button>
+                <div className="text-[11px] font-mono text-white/40 text-right">
+                  <div>{city.lng.toFixed(2)}°{city.lng >= 0 ? 'E' : 'W'}</div>
+                  <div>{Math.abs(city.lat).toFixed(2)}°{city.lat >= 0 ? 'N' : 'S'}</div>
+                </div>
               </div>
-
-              {/* 真太阳时偏移可视化 */}
-              {useTrueSolar && (
-                <div className="text-[10px] text-white/40 font-mono">
-                  ↳ 真太阳时偏移 {((city.lng - 120) * 4).toFixed(1)} 分钟
-                  （{(city.lng - 120) > 0 ? '比北京时间提前' : '比北京时间延后'}）
+              {useTrueSolar && city.lng !== 120 && (
+                <div className="text-[11px] text-white/50 mt-3 font-mono">
+                  ↳ 真太阳时偏移 {((city.lng - 120) * 4).toFixed(1)} 分钟（
+                  {(city.lng - 120) > 0 ? '比北京时间早' : '比北京时间晚'}）
                 </div>
               )}
+            </div>
 
-              {showCityList && (
-                <div className="mt-4 border border-white/10 max-h-72 overflow-y-auto animate-slide-down">
-                  <input
-                    type="text"
-                    value={citySearch}
-                    onChange={(e) => setCitySearch(e.target.value)}
-                    placeholder="搜索城市…"
-                    className="w-full bg-white/5 border-b border-white/10 px-4 py-3 text-sm focus:outline-none focus:bg-white/10"
-                    autoFocus
-                  />
-                  {filteredCities.map((c) => (
+            {/* 搜索 */}
+            <div className="relative mb-4">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
+              <input
+                type="text"
+                value={citySearch}
+                onChange={(e) => {
+                  setCitySearch(e.target.value);
+                  setShowCitySearch(true);
+                }}
+                onFocus={() => setShowCitySearch(true)}
+                placeholder="搜索城市（中文 / 拼音首字母如 BJ）..."
+                className="w-full bg-white/[0.02] border border-white/10 pl-12 pr-12 py-4 text-base focus:border-[#FF4D00] focus:outline-none transition-colors"
+                style={{ fontFamily: 'Noto Serif SC' }}
+              />
+              {citySearch && (
+                <button
+                  onClick={() => { setCitySearch(''); setShowCitySearch(false); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+
+            {/* 搜索结果 */}
+            {showCitySearch && citySearch && (
+              <div className="bg-[#0a0a0a] border border-white/10 max-h-64 overflow-y-auto mb-4 animate-slide-down">
+                {filteredCities.length === 0 ? (
+                  <div className="p-4 text-center text-white/40 text-sm">没找到这个城市</div>
+                ) : (
+                  filteredCities.slice(0, 50).map((c) => (
                     <button
                       key={c.name}
                       type="button"
                       onClick={() => {
                         setCity(c);
-                        setShowCityList(false);
                         setCitySearch('');
+                        setShowCitySearch(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-[#FF4D00]/20 hover:text-[#FF4D00] transition-colors flex justify-between"
+                      className="w-full text-left px-4 py-3 text-sm hover:bg-[#FF4D00]/20 hover:text-[#FF4D00] transition-colors flex justify-between items-center border-b border-white/5"
+                      style={{ fontFamily: 'Noto Serif SC' }}
                     >
                       <span>{c.name}</span>
-                      <span className="text-white/30 text-xs font-mono">{c.lng.toFixed(2)}°</span>
+                      <span className="text-white/30 text-[10px] font-mono">
+                        {c.lng.toFixed(2)}°{c.lng >= 0 ? 'E' : 'W'}
+                      </span>
                     </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                  ))
+                )}
+              </div>
+            )}
 
-            <label className="flex items-center gap-2 mt-3 text-xs text-white/60 cursor-pointer">
+            {/* 热门快捷（不在搜索时显示） */}
+            {!citySearch && (
+              <div className="space-y-3">
+                {POPULAR_GROUPS.map((group) => (
+                  <div key={group.region}>
+                    <div className="text-[10px] font-mono text-white/30 tracking-widest mb-2">
+                      {group.region.toUpperCase()}
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {group.cities.map((cn) => {
+                        const c = CITIES.find((x) => x.name === cn);
+                        if (!c) return null;
+                        const active = city.name === cn;
+                        return (
+                          <button
+                            key={cn}
+                            type="button"
+                            onClick={() => setCity(c)}
+                            className={`px-4 py-2 text-sm border transition-all ${
+                              active
+                                ? 'border-[#FF4D00] bg-[#FF4D00]/10 text-[#FF4D00]'
+                                : 'border-white/10 bg-white/[0.02] text-white/60 hover:border-white/30'
+                            }`}
+                            style={{ fontFamily: 'Noto Serif SC' }}
+                          >
+                            {cn}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <label className="flex items-center gap-2 mt-4 text-xs text-white/60 cursor-pointer">
               <input
                 type="checkbox"
                 checked={useTrueSolar}
@@ -322,12 +399,12 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
                 className="accent-[#FF4D00]"
               />
               <span style={{ fontFamily: 'Noto Serif SC' }}>使用真太阳时校正</span>
-              <span className="text-[10px] text-white/30 ml-1">（推荐，按经度精修）</span>
+              <span className="text-[10px] text-white/30">（推荐）</span>
             </label>
-          </FormSection>
+          </Section>
 
           {/* 提交 */}
-          <div className="pt-8">
+          <div className="pt-6">
             <button
               onClick={submit}
               disabled={!valid}
@@ -337,7 +414,7 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
               <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
             </button>
             <p className="text-center text-[10px] font-mono text-white/30 tracking-widest mt-4">
-              一次解码 = 八字 + 占星 + 数字命理 + 姓名学 + 综合
+              一次解码 = 八字 · 占星 · 数字命理 · 姓名学 · 综合
             </p>
           </div>
         </div>
@@ -348,54 +425,83 @@ export default function InputForm({ onSubmit, onBack, initialValues }) {
 
 // ============ 子组件 ============
 
-const FormSection = ({ num, title, sub, hint, children }) => (
+const Section = ({ num, title, hint, children }) => (
   <section className="animate-fade-in-up">
-    <div className="flex items-baseline gap-4 mb-2">
+    <div className="flex items-baseline gap-3 mb-2">
       <span className="text-[10px] font-mono text-[#FF4D00] tracking-widest">{num}</span>
-      <h2 className="text-2xl md:text-3xl font-bold tracking-wide" style={{ fontFamily: 'Noto Serif SC' }}>
+      <h2 className="text-xl md:text-2xl font-bold tracking-wide" style={{ fontFamily: 'Noto Serif SC' }}>
         {title}
       </h2>
-      <span className="text-[10px] font-mono text-white/30 tracking-widest hidden md:inline">
-        {sub}
-      </span>
     </div>
     {hint && (
-      <p className="text-xs text-white/40 mb-5 tracking-wide" style={{ fontFamily: 'Noto Serif SC' }}>
-        {hint}
-      </p>
+      <p className="text-xs text-white/40 mb-4 tracking-wide">{hint}</p>
     )}
     {children}
   </section>
 );
 
-const BigInput = ({ value, onChange, placeholder, icon }) => (
-  <div className="relative">
-    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#FF4D00]/40 text-lg pointer-events-none" style={{ fontFamily: 'Noto Serif SC' }}>
-      {icon}
-    </span>
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full bg-white/[0.02] border border-white/10 pl-12 pr-4 py-4 text-base focus:border-[#FF4D00] focus:outline-none transition-colors"
-      style={{ fontFamily: 'Noto Serif SC' }}
-    />
-  </div>
+const SoftInput = ({ value, onChange, placeholder }) => (
+  <input
+    type="text"
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    placeholder={placeholder}
+    className="w-full bg-white/[0.02] border border-white/10 px-4 py-4 text-base focus:border-[#FF4D00] focus:outline-none transition-colors"
+    style={{ fontFamily: 'Noto Serif SC' }}
+  />
 );
 
-const DateInput = ({ value, onChange, min, max, suffix, big }) => (
-  <div className="relative">
-    <input
-      type="number"
-      value={value}
-      onChange={(e) => onChange(Math.max(min, Math.min(max, parseInt(e.target.value) || min)))}
-      min={min}
-      max={max}
-      className={`w-full bg-white/[0.02] border border-white/10 ${big ? 'py-5 text-2xl' : 'py-3 text-base'} px-4 focus:border-[#FF4D00] focus:outline-none transition-colors text-center font-mono`}
-    />
-    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 text-xs pointer-events-none" style={{ fontFamily: 'Noto Serif SC' }}>
-      {suffix}
-    </span>
-  </div>
-);
+// HTML5 date 输入：原生日历选择器，PC 鼠标点击 + 键盘输入都丝滑
+const DateInput = ({ value, onChange }) => {
+  const [year, month, day] = value.split('-').map((n) => parseInt(n, 10));
+  return (
+    <div className="relative bg-white/[0.02] border border-white/10 hover:border-white/30 focus-within:border-[#FF4D00] transition-colors">
+      <div className="flex items-center px-5 py-5">
+        <div className="flex-1 flex items-baseline gap-3">
+          <span className="text-4xl md:text-5xl font-bold text-[#FF4D00]" style={{ fontFamily: 'Noto Serif SC' }}>{year}</span>
+          <span className="text-white/40 text-sm">年</span>
+          <span className="text-4xl md:text-5xl font-bold" style={{ fontFamily: 'Noto Serif SC' }}>{month}</span>
+          <span className="text-white/40 text-sm">月</span>
+          <span className="text-4xl md:text-5xl font-bold" style={{ fontFamily: 'Noto Serif SC' }}>{day}</span>
+          <span className="text-white/40 text-sm">日</span>
+        </div>
+        <span className="text-[10px] font-mono text-white/30 tracking-widest hidden md:block">CLICK / TAP →</span>
+      </div>
+      {/* 隐形覆盖整个区域的原生 input，点击任何位置都能弹出系统日期选择器 */}
+      <input
+        type="date"
+        value={value}
+        min="1900-01-01"
+        max="2099-12-31"
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+      />
+    </div>
+  );
+};
+
+const TimeInput = ({ value, onChange }) => {
+  const [hour, minute] = value.split(':').map((n) => parseInt(n, 10));
+  return (
+    <div className="relative bg-white/[0.02] border border-white/10 hover:border-white/30 focus-within:border-[#FF4D00] transition-colors">
+      <div className="flex items-center px-5 py-4">
+        <div className="flex items-baseline gap-2">
+          <span className="text-4xl md:text-5xl font-bold text-[#FF4D00] font-mono">
+            {String(hour).padStart(2, '0')}
+          </span>
+          <span className="text-white/40 text-sm">时</span>
+          <span className="text-4xl md:text-5xl font-bold font-mono">
+            {String(minute).padStart(2, '0')}
+          </span>
+          <span className="text-white/40 text-sm">分</span>
+        </div>
+      </div>
+      <input
+        type="time"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+      />
+    </div>
+  );
+};
