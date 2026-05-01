@@ -9,3 +9,4 @@ dist-ssr
 
 # Claude Preview tooling
 .claude/
+DEPLOY_CREDENTIALS.md
