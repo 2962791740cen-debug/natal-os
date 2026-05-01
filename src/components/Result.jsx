@@ -1,19 +1,30 @@
-import React, { useState, useMemo } from 'react';
-import { RotateCcw, Hexagon, Sparkles, Activity, TreePine, Layers } from 'lucide-react';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
+import { RotateCcw, ChevronUp } from 'lucide-react';
 import { Brand, NoiseLayer, KeyValue } from './shared.jsx';
 import { WUXING } from '../lib/constants.js';
 import { getCurrentDaYun, getCurrentLiuNian } from '../lib/bazi.js';
-import BaziSection from './result/BaziSection.jsx';
-import AstrologySection from './result/AstrologySection.jsx';
-import NumerologySection from './result/NumerologySection.jsx';
-import NamingSection from './result/NamingSection.jsx';
-import SynthesisSection from './result/SynthesisSection.jsx';
+import { generateManual } from '../lib/manual.js';
 import CorePortrait from './result/CorePortrait.jsx';
 import PersonaSection from './result/PersonaSection.jsx';
+import Chapter from './result/Chapter.jsx';
+import Blueprint from './result/Blueprint.jsx';
+import LifeArc from './result/LifeArc.jsx';
+import Manual from './result/Manual.jsx';
+import Closing from './result/Closing.jsx';
 
-export default function Result({ bazi, astrology, numerology, naming, mayaKin, synthesisCards, archetype, persona, input, onRestart }) {
-  const [tab, setTab] = useState('bazi');
+const CHAPTERS = [
+  { id: 'who', num: '01', en: 'WHO YOU ARE', cn: '你是谁' },
+  { id: 'how', num: '02', en: 'HOW YOU LIVE', cn: '你怎么活着' },
+  { id: 'blueprint', num: '03', en: 'THE BLUEPRINT', cn: '天体配置' },
+  { id: 'arc', num: '04', en: 'YOUR LIFE ARC', cn: '人生弧线' },
+  { id: 'manual', num: '05', en: 'OPERATING MANUAL', cn: '运营手册' },
+];
 
+export default function Result({
+  bazi, astrology, numerology, naming, mayaKin,
+  archetype, persona, input, onRestart,
+}) {
+  // 计算补充数据
   const today = new Date();
   const currentYear = today.getFullYear();
   const age = useMemo(() => {
@@ -29,20 +40,49 @@ export default function Result({ bazi, astrology, numerology, naming, mayaKin, s
   const currentLiuNian = getCurrentLiuNian(currentYear);
   const dayMasterColor = WUXING[bazi.dayMasterWuxing].color;
 
-  const tabs = [
-    { key: 'bazi', label: '生辰八字', en: 'BAZI', icon: TreePine },
-    ...(astrology ? [{ key: 'astrology', label: '西方占星', en: 'ASTRO', icon: Sparkles }] : []),
-    { key: 'numerology', label: '数字命理', en: 'NUM', icon: Hexagon },
-    { key: 'naming', label: '姓名学', en: 'NAME', icon: Activity },
-    { key: 'synthesis', label: '交叉综述', en: 'SYN', icon: Layers },
-  ];
+  // 运营手册（在 Result 这层生成，避免每次 render 重算）
+  const manual = useMemo(
+    () => generateManual({ bazi, archetype, astrology }),
+    [bazi, archetype, astrology]
+  );
+
+  // 阅读进度
+  const [progress, setProgress] = useState(0);
+  const [activeChapter, setActiveChapter] = useState('who');
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const refs = useRef({});
+
+  useEffect(() => {
+    const onScroll = () => {
+      const scrolled = window.scrollY;
+      const total = document.documentElement.scrollHeight - window.innerHeight;
+      setProgress(total ? Math.min(100, (scrolled / total) * 100) : 0);
+      setShowBackToTop(scrolled > 600);
+
+      // 当前章节
+      const scrollMid = scrolled + window.innerHeight / 3;
+      let active = 'who';
+      CHAPTERS.forEach((c) => {
+        const el = refs.current[c.id];
+        if (el && el.offsetTop <= scrollMid) active = c.id;
+      });
+      setActiveChapter(active);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const scrollToChapter = (id) => {
+    refs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <div className="min-h-screen bg-black text-white relative">
       <NoiseLayer opacity={0.025} />
 
-      {/* 固定顶部 */}
-      <div className="sticky top-0 z-30 bg-black/85 backdrop-blur-md border-b border-white/5">
+      {/* ===== 顶部导航 ===== */}
+      <div className="sticky top-0 z-40 bg-black/85 backdrop-blur-md border-b border-white/5">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Brand subtitle="REPORT" />
           <button
@@ -53,164 +93,151 @@ export default function Result({ bazi, astrology, numerology, naming, mayaKin, s
           </button>
         </div>
 
-        {/* Tab Bar */}
+        {/* 章节小目录（横向 chips） */}
         <div className="max-w-6xl mx-auto px-6 border-t border-white/5">
-          <div className="flex gap-1 overflow-x-auto -mx-2 px-2 scrollbar-thin">
-            {tabs.map((t) => (
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin py-2">
+            {CHAPTERS.map((c) => (
               <button
-                key={t.key}
-                onClick={() => {
-                  setTab(t.key);
-                  window.scrollTo({ top: 320, behavior: 'smooth' });
-                }}
-                className={`flex-shrink-0 px-4 py-3 flex items-center gap-2 text-sm tracking-wide transition-all ${
-                  tab === t.key
-                    ? 'text-[#FF4D00] tab-active'
-                    : 'text-white/50 hover:text-white'
+                key={c.id}
+                onClick={() => scrollToChapter(c.id)}
+                className={`flex-shrink-0 px-3 py-2 text-xs tracking-wider transition-all whitespace-nowrap ${
+                  activeChapter === c.id
+                    ? 'text-[#FF4D00]'
+                    : 'text-white/40 hover:text-white/70'
                 }`}
+                style={{ fontFamily: 'Noto Serif SC' }}
               >
-                <t.icon size={14} />
-                <span style={{ fontFamily: 'Noto Serif SC' }}>{t.label}</span>
-                <span className="text-[9px] font-mono text-white/30 tracking-widest">
-                  {t.en}
-                </span>
+                <span className="font-mono text-[10px] mr-1.5 opacity-60">{c.num}</span>
+                {c.cn}
               </button>
             ))}
           </div>
         </div>
+
+        {/* 阅读进度条 */}
+        <div className="absolute bottom-0 left-0 h-px bg-[#FF4D00] transition-all duration-300" style={{ width: `${progress}%` }} />
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-12 relative z-10">
-        {/* 主体身份信息 */}
-        <section className="mb-16">
+      <main className="max-w-6xl mx-auto px-6 py-12 relative z-10">
+
+        {/* ===== HERO STRIP ===== */}
+        <section className="mb-8 animate-fade-in-up">
           <p className="text-[10px] font-mono text-[#FF4D00] tracking-[0.4em] mb-4">
-            // SUBJECT.IDENTIFIED
+            // SUBJECT
           </p>
           <h1
-            className="text-5xl md:text-7xl font-bold mb-2 tracking-wide"
+            className="text-5xl md:text-7xl font-bold mb-4 tracking-wide"
             style={{ fontFamily: 'Noto Serif SC' }}
           >
             {input.name}
           </h1>
-          <div className="flex items-center gap-3 mb-8 text-white/50 text-sm">
+          <div className="flex items-center gap-3 mb-8 text-sm text-white/50 flex-wrap">
             <span>{age} 岁</span>
             <span className="text-white/20">·</span>
             <span>{input.gender === 'male' ? '男' : '女'}</span>
             <span className="text-white/20">·</span>
             <span>属{bazi.zodiac}</span>
-            <span className="text-white/20">·</span>
             {astrology && (
               <>
-                <span>{astrology.sunSign}日座</span>
                 <span className="text-white/20">·</span>
+                <span>{astrology.sunSign}日</span>
+                <span className="text-white/20">·</span>
+                <span>{astrology.moonSign}月</span>
+                <span className="text-white/20">·</span>
+                <span>{astrology.ascSign}升</span>
               </>
             )}
-            <span>{bazi.dayMasterMeta?.element}</span>
+            <span className="text-white/20">·</span>
+            <span>{input.cityName}</span>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 text-sm">
-            <div className="space-y-2 text-white/60">
-              <KeyValue label="SOLAR" value={`${bazi.rawSolarStr}（北京时）`} />
-              {bazi.offsetMin !== 0 && (
-                <KeyValue
-                  label="TRUE.SOL"
-                  value={`${bazi.solarStr}（真太阳时，校正 ${bazi.offsetMin > 0 ? '+' : ''}${bazi.offsetMin.toFixed(0)}分）`}
-                />
-              )}
-              <KeyValue label="LUNAR" value={bazi.lunarStr} />
-              <KeyValue label="PLACE" value={`${input.cityName} (${input.longitude.toFixed(2)}°E, ${input.latitude.toFixed(2)}°N)`} />
-              <KeyValue label="QI.YUN" value={bazi.qiYunStr} />
-              <KeyValue label="LIUNIAN" value={`${currentYear}年 ${currentLiuNian}`} />
-            </div>
-
-            <div className="bg-white/[0.03] border border-white/10 p-6">
-              <div className="text-[10px] font-mono text-[#FF4D00] tracking-widest mb-3">
-                DAY MASTER · 日主
-              </div>
-              <div className="flex items-baseline gap-4 mb-4">
-                <span
-                  className="text-7xl font-bold leading-none"
-                  style={{ fontFamily: 'Noto Serif SC', color: dayMasterColor }}
-                >
-                  {bazi.dayMaster}
-                </span>
-                <div>
-                  <div className="text-lg" style={{ fontFamily: 'Noto Serif SC' }}>
-                    {bazi.dayMasterMeta.meta}
-                  </div>
-                  <div className="text-xs text-white/40 tracking-widest">
-                    {bazi.dayMasterMeta.element}
-                  </div>
-                </div>
-              </div>
-              <p className="text-xs text-white/60 leading-relaxed mb-3">
-                {bazi.dayMasterMeta.traits}
-              </p>
-              <div className="text-[10px] font-mono text-white/30 tracking-widest">
-                {bazi.dayMasterMeta.shape}
-              </div>
-            </div>
-          </div>
-
-          {/* 四柱缩略 */}
-          <div className="mt-8 inline-flex items-baseline gap-2 bg-white/[0.02] border border-white/10 px-6 py-4">
-            <span className="text-[10px] font-mono text-white/40 tracking-widest mr-3">
-              BAZI
-            </span>
-            {[bazi.pillars.year, bazi.pillars.month, bazi.pillars.day, bazi.pillars.time].map((p, i) => (
-              <span
-                key={i}
-                className="text-2xl font-bold mx-1"
-                style={{ fontFamily: 'Noto Serif SC' }}
-              >
-                <span style={{ color: WUXING[bazi.dayMasterWuxing] && WUXING[bazi.shiShen ? 'huo' : 'huo']?.color || '#fff' }}>
-                  {p.gan}
-                </span>
-                {p.zhi}
-              </span>
-            ))}
+          {/* 出生信息小字 */}
+          <div className="grid md:grid-cols-2 gap-4 text-xs text-white/50 max-w-3xl">
+            <KeyValue label="SOLAR" value={bazi.rawSolarStr} />
+            {bazi.offsetMin !== 0 && (
+              <KeyValue label="TRUE.SOL" value={`${bazi.solarStr}（校正 ${bazi.offsetMin > 0 ? '+' : ''}${bazi.offsetMin.toFixed(0)}分）`} />
+            )}
+            <KeyValue label="LUNAR" value={bazi.lunarStr} />
+            <KeyValue label="DAY MASTER" value={`${bazi.dayMaster} · ${bazi.dayMasterMeta?.meta}`} />
           </div>
         </section>
 
-        <div className="section-divider mb-8" />
-
-        {/* 核心画像 - 第一眼共鸣的关键 */}
-        {archetype && (
-          <CorePortrait
-            archetype={archetype}
-            name={input.name}
-            age={age}
-            gender={input.gender}
-          />
-        )}
-
-        {/* "你这个人" - 场景化共鸣段落 */}
-        {persona && persona.length > 0 && (
-          <>
-            <div className="section-divider my-8" />
-            <PersonaSection categories={persona} />
-          </>
-        )}
-
-        <div className="section-divider mb-16" />
-
-        {/* Tab Content */}
-        {tab === 'bazi' && <BaziSection bazi={bazi} age={age} currentDaYun={currentDaYun} />}
-        {tab === 'astrology' && astrology && <AstrologySection astrology={astrology} />}
-        {tab === 'numerology' && (
-          <NumerologySection numerology={numerology} mayaKin={mayaKin} />
-        )}
-        {tab === 'naming' && <NamingSection naming={naming} />}
-        {tab === 'synthesis' && <SynthesisSection cards={synthesisCards} />}
-
-        {/* 底部 */}
-        <div className="border-t border-white/10 mt-20 pt-12 pb-8 text-center">
-          <p className="text-[10px] font-mono text-white/30 tracking-widest leading-loose">
-            NATAL.OS · GENESIS PROTOCOL v2.0<br />
-            生于 {bazi.rawSolarStr} · 算于 {currentYear}-{String(today.getMonth() + 1).padStart(2, '0')}-{String(today.getDate()).padStart(2, '0')}
-          </p>
+        {/* ===== CHAPTER 01 · 你是谁 ===== */}
+        <div ref={(el) => (refs.current['who'] = el)}>
+          <Chapter num="01" en="WHO YOU ARE" cn="你是谁">
+            {archetype && (
+              <CorePortrait
+                archetype={archetype}
+                name={input.name}
+                age={age}
+                gender={input.gender}
+              />
+            )}
+          </Chapter>
         </div>
-      </div>
+
+        {/* ===== CHAPTER 02 · 你怎么活着 ===== */}
+        <div ref={(el) => (refs.current['how'] = el)}>
+          <Chapter num="02" en="HOW YOU LIVE" cn="你怎么活着">
+            {persona && persona.length > 0 ? (
+              <PersonaSection categories={persona} />
+            ) : (
+              <p className="text-white/50">数据不足以生成场景化共鸣</p>
+            )}
+          </Chapter>
+        </div>
+
+        {/* ===== CHAPTER 03 · 天体配置 ===== */}
+        <div ref={(el) => (refs.current['blueprint'] = el)}>
+          <Chapter num="03" en="THE BLUEPRINT" cn="你的天体配置">
+            <Blueprint
+              bazi={bazi}
+              astrology={astrology}
+              numerology={numerology}
+              mayaKin={mayaKin}
+              naming={naming}
+            />
+          </Chapter>
+        </div>
+
+        {/* ===== CHAPTER 04 · 人生弧线 ===== */}
+        <div ref={(el) => (refs.current['arc'] = el)}>
+          <Chapter num="04" en="YOUR LIFE ARC" cn="你的人生弧线">
+            <LifeArc
+              bazi={bazi}
+              age={age}
+              currentDaYun={currentDaYun}
+              currentLiuNian={currentLiuNian}
+            />
+          </Chapter>
+        </div>
+
+        {/* ===== CHAPTER 05 · 运营手册 ===== */}
+        <div ref={(el) => (refs.current['manual'] = el)}>
+          <Chapter num="05" en="OPERATING MANUAL" cn="运营手册">
+            <p className="text-sm text-white/50 mb-8 leading-relaxed max-w-2xl" style={{ fontFamily: 'Noto Serif SC' }}>
+              这一章把上面所有的"概念"，翻译成<span className="text-[#FF4D00]">能落地到日常的动作</span>——
+              该穿什么颜色、该往哪走、该做什么、该避什么。
+            </p>
+            <Manual manual={manual} bazi={bazi} />
+          </Chapter>
+        </div>
+
+        {/* ===== 收束 ===== */}
+        <Closing archetype={archetype} onRestart={onRestart} />
+
+      </main>
+
+      {/* 浮动回顶部按钮 */}
+      {showBackToTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="fixed bottom-6 right-6 z-50 w-12 h-12 bg-[#FF4D00] text-black flex items-center justify-center hover:bg-white transition-colors animate-fade-in"
+          aria-label="回到顶部"
+        >
+          <ChevronUp size={20} />
+        </button>
+      )}
     </div>
   );
 }
